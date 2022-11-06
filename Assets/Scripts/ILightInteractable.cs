@@ -3,25 +3,36 @@ using System.Collections.Generic;
 using UnityEngine;
 
 public struct LightInputInfo{
-    Stack<GameObject> currentHier;
+    public Stack<GameObject> currentHier;
 
-    bool hitFromInside;
+    public Utility.hitCategory hitType;
 
-    Vector3 dir;
+    public Vector3 dir;
     
-    Vector3 hitPos;
+    public RaycastHit hitInfo;
 
+    public LightInputInfo(Stack<GameObject> currentHier, Utility.hitCategory hitType, Vector3 dir, RaycastHit hitInfo){
+        this.hitType = hitType;
+        this.dir = dir;
+        this.hitInfo = hitInfo;
+        this.currentHier = currentHier;
+    }
 }
 
 public struct LightOutputInfo{
-    List<Stack<GameObject>> hiers;
+    public List<Stack<GameObject>> hiers;
 
-    List<Ray> rays;
-    
+    public List<Ray> rays;
+
+    public LightOutputInfo(List<Stack<GameObject>> hiers, List<Ray> rays){
+        this.hiers = hiers;
+        this.rays = rays;
+    }
+
 }
 
 //class with this interface will interact with light
 public interface ILightInteractable
 {
-    void interact(LightInputInfo inputInfo, out LightOutputInfo outputInfo);
+    void lightHit(LightInputInfo inputInfo, out LightOutputInfo outputInfo);
 }

@@ -5,6 +5,11 @@ using UnityEngine;
 public static class Utility
 {
     public const int TEMPORARY_LAYER = 31;
+    public enum hitCategory{
+        noHit,
+        hitFromInside,
+        hitFromOutside
+    }
     public static void cloneStack<myType>(Stack<myType> from, Stack<myType> to){
         myType[] temp = new myType[from.Count];
         from.CopyTo(temp, 0);
@@ -20,6 +25,8 @@ public static class Utility
         return old;
     }
 
+    // the result is not senstive to whether the direction of normal is from inside or outside of
+    // the surface
     public static bool refract(Vector3 inRay, Vector3 n, double n1, double n2, out Vector3 outRay){
 
         Vector3 normal;

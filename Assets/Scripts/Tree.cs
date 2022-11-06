@@ -6,6 +6,7 @@ public class Node{
     public Vector3 pos;
     public Node reflection;
     public Node refraction;
+    public List<Node> children;
 
     public Node(Vector3 pos, Node reflection, Node refraction){
         this.pos = pos;
@@ -16,6 +17,7 @@ public class Node{
         this.pos = Vector3.zero;
         this.reflection = null;
         this.refraction = null;
+        children = new List<Node>();
     }
 
     public Node(Vector3 pos){

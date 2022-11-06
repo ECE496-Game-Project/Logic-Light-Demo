@@ -13,14 +13,16 @@ public class Light
     public const float MAX_DISTANCE = 30;
     public const int DETECTION_LAYER = 0;
     
-    public const int MAX_INTERACTION = 2;
+    public const int MAX_INTERACTION = 3;
     public const float FUDGE_FACTOR = 1e-4f;
+
+    
 
     public Light(Vector3 pos, Vector3 dir, Material lightMaterial){
         this.lightObject = new GameObject("Light");
         this.laser = (this.lightObject.AddComponent(typeof(LineRenderer))) as LineRenderer;
-        this.laser.startWidth = 0.01f;
-        this.laser.endWidth = 0.01f;
+        this.laser.startWidth = 0.005f;
+        this.laser.endWidth = 0.005f;
         this.laser.material = lightMaterial;
         this.laser.startColor = Color.green;
         this.laser.endColor = Color.green;
@@ -41,7 +43,7 @@ public class Light
         List<Vector3> points = new List<Vector3>();
 
         points.Add(lightPath.startPos);
-        addTreeToList(lightPath.root, points);
+        addTreeToList2(lightPath.root, points);
 
         this.laser.positionCount = points.Count;
         this.laser.SetPositions(points.ToArray());
@@ -60,11 +62,104 @@ public class Light
             points.Add(node.pos);
         }
     }
-    
+    void addTreeToList2(Node node, List<Vector3> points){
+        points.Add(node.pos);
+
+        for (int i = 0; i < node.children.Count; i++){
+            addTreeToList2(node.children[i], points);
+            points.Add(node.pos);
+        }
+
+    }
+
     void castRay(Vector3 pos, Vector3 dir, Stack<GameObject> hierarchy){
         this.lightPath = new Tree(pos);
-        lightPath.root = castRayHelper(pos, dir, hierarchy, 0, 0);
+        //lightPath.root = castRayHelper(pos, dir, hierarchy, 0, 0);
+        lightPath.root = castRayHelper2(pos, dir, hierarchy, 0);
     }
+
+    Node castRayHelper2(Vector3 pos, Vector3 dir, Stack<GameObject> hierarchy, int depth){
+        if (depth > MAX_INTERACTION){
+            return null;
+        }else if(hierarchy.Count == 0){
+            return null;
+        }
+
+        Node newNode = new Node();
+        RaycastHit hit;
+        Utility.hitCategory hitInfo = rayDetection2(pos, dir, hierarchy, out hit);
+        
+        if (hitInfo == Utility.hitCategory.noHit){
+            newNode.pos = pos + MAX_DISTANCE * dir;
+            return newNode;
+        }
+
+        newNode.pos = hit.point;
+        LightInputInfo inputInfo = new LightInputInfo(hierarchy, hitInfo, dir, hit);
+        LightOutputInfo outputInfo = new LightOutputInfo();
+        GameObject hitObject = hit.collider.gameObject;
+        ILightInteractable interactable = hitObject.GetComponent<ILightInteractable>();
+
+        if (interactable == null){
+            return newNode;
+        }
+        
+        interactable.lightHit(inputInfo, out outputInfo);
+        if (outputInfo.rays.Count >= 2){
+            Debug.Log(dir + " " + outputInfo.rays[1].direction);
+        }
+        
+
+        for (int i = 0; i < outputInfo.rays.Count; i++){
+            if (outputInfo.rays[i].origin != newNode.pos){
+                Debug.LogWarning("The light path is not continous");
+            }
+            Node child = castRayHelper2(outputInfo.rays[i].origin, outputInfo.rays[i].direction, outputInfo.hiers[i], depth+1);
+            
+            if (child != null) newNode.children.Add(child);
+            
+        }
+        return newNode;   
+    }
+
+
+    // return whether the ray hits a collider
+    Utility.hitCategory rayDetection2(Vector3 pos, Vector3 dir, Stack<GameObject> hierarchy, out RaycastHit hit){
+
+        LayerMask mask = 1 << DETECTION_LAYER;
+        pos = pos + FUDGE_FACTOR * dir;
+        Ray ray = new Ray(pos, dir);
+        
+        
+        // check if the ray hit an game object(collider) in the current medium
+        if (Physics.Raycast(ray, out hit, MAX_DISTANCE, mask)){
+            //Debug.Log("hit an object");
+            //Debug.Log(hit.point);
+            //check if it is in the current medium
+            if (Utility.isInside(hierarchy.Peek(), hit.point)){
+                return Utility.hitCategory.hitFromOutside;
+            }
+            
+        }
+
+        // check if the ray exit the current medium, we need to reverse the
+        // ray because raycast can not hit the boundary from the inside
+        Ray reversedRay = new Ray(ray.GetPoint(MAX_DISTANCE), -1 * dir);
+
+        GameObject current = hierarchy.Peek();
+
+        bool isHit = current.GetComponent<Collider>().Raycast(reversedRay, out hit, MAX_DISTANCE);
+
+        if (isHit){
+            //Debug.Log(pos);
+            //Debug.Log(hit.point);
+            
+            return Utility.hitCategory.hitFromInside;
+            //Debug.Log(n1.ToString() + ", " + n2.ToString());
+        }
+        return Utility.hitCategory.noHit;
+    }
+
 
     Node castRayHelper(Vector3 pos, Vector3 dir, Stack<GameObject> hierarchy, int numReflection, int numRefraction){
         
