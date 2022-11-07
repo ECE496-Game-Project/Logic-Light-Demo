@@ -48,20 +48,7 @@ public class Light
         this.laser.positionCount = points.Count;
         this.laser.SetPositions(points.ToArray());
     }
-
-    void addTreeToList(Node node, List<Vector3> points){
-        points.Add(node.pos);
-
-        if (node.reflection != null){
-            addTreeToList(node.reflection, points);
-            points.Add(node.pos);
-        }
-
-        if (node.refraction != null){
-            addTreeToList(node.refraction, points);
-            points.Add(node.pos);
-        }
-    }
+    
     void addTreeToList2(Node node, List<Vector3> points){
         points.Add(node.pos);
 
@@ -75,10 +62,10 @@ public class Light
     void castRay(Vector3 pos, Vector3 dir, Stack<GameObject> hierarchy){
         this.lightPath = new Tree(pos);
         //lightPath.root = castRayHelper(pos, dir, hierarchy, 0, 0);
-        lightPath.root = castRayHelper2(pos, dir, hierarchy, 0);
+        lightPath.root = castRayHelper(pos, dir, hierarchy, 0);
     }
 
-    Node castRayHelper2(Vector3 pos, Vector3 dir, Stack<GameObject> hierarchy, int depth){
+    Node castRayHelper(Vector3 pos, Vector3 dir, Stack<GameObject> hierarchy, int depth){
         if (depth > MAX_INTERACTION){
             return null;
         }else if(hierarchy.Count == 0){
@@ -87,7 +74,7 @@ public class Light
 
         Node newNode = new Node();
         RaycastHit hit;
-        Utility.hitCategory hitInfo = rayDetection2(pos, dir, hierarchy, out hit);
+        Utility.hitCategory hitInfo = rayDetection(pos, dir, hierarchy, out hit);
         
         if (hitInfo == Utility.hitCategory.noHit){
             newNode.pos = pos + MAX_DISTANCE * dir;
@@ -114,7 +101,7 @@ public class Light
             if (outputInfo.rays[i].origin != newNode.pos){
                 Debug.LogWarning("The light path is not continous");
             }
-            Node child = castRayHelper2(outputInfo.rays[i].origin, outputInfo.rays[i].direction, outputInfo.hiers[i], depth+1);
+            Node child = castRayHelper(outputInfo.rays[i].origin, outputInfo.rays[i].direction, outputInfo.hiers[i], depth+1);
             
             if (child != null) newNode.children.Add(child);
             
@@ -124,7 +111,7 @@ public class Light
 
 
     // return whether the ray hits a collider
-    Utility.hitCategory rayDetection2(Vector3 pos, Vector3 dir, Stack<GameObject> hierarchy, out RaycastHit hit){
+    Utility.hitCategory rayDetection(Vector3 pos, Vector3 dir, Stack<GameObject> hierarchy, out RaycastHit hit){
 
         LayerMask mask = 1 << DETECTION_LAYER;
         pos = pos + FUDGE_FACTOR * dir;
@@ -159,9 +146,76 @@ public class Light
         }
         return Utility.hitCategory.noHit;
     }
+    
+    public static List<Tuple<Collider, Vector3>> crateTupleList(Collider[] colliders, Vector3 referencePoint){
+        List<Tuple<Collider, Vector3>> result = new List<Tuple<Collider, Vector3>>();
+        foreach(Collider c in colliders){
+            result.Add(new Tuple<Collider, Vector3>(c, referencePoint));
+        }
+        return result;
+    }
 
+    public static int compareTuple(Tuple<Collider, Vector3> t1, Tuple<Collider, Vector3> t2){    
+        //Debug.Log(t1.Item1.gameObject.name + " " + findShortestDistance(t1.Item1, t1.Item2).ToString());
+        //Debug.Log(t2.Item1.gameObject.name + " " + findShortestDistance(t2.Item1, t2.Item2).ToString());
+        if (findShortestDistance(t1.Item1, t1.Item2) < findShortestDistance(t2.Item1, t2.Item2)){
+            return -1;
+        }else{
+            return 1;
+        }
+    }
 
-    Node castRayHelper(Vector3 pos, Vector3 dir, Stack<GameObject> hierarchy, int numReflection, int numRefraction){
+    public static double findShortestDistance(Collider c, Vector3 referencePoint){
+
+        Vector3 min, max;
+        min = c.bounds.min;
+        max = c.bounds.max;
+
+        double deltaX, deltaY, deltaZ;
+        //x
+        deltaX = (Math.Abs(referencePoint.x - min.x) < Math.Abs(max.x - referencePoint.x))? Math.Abs(referencePoint.x - min.x): Math.Abs(max.x - referencePoint.x);
+        //y
+        deltaY = (Math.Abs(referencePoint.y - min.y) < Math.Abs(max.y - referencePoint.y))? Math.Abs(referencePoint.y - min.y): Math.Abs(max.y - referencePoint.y);
+
+        //z
+        deltaZ = (Math.Abs(referencePoint.z - min.z) < Math.Abs(max.z - referencePoint.z))? Math.Abs(referencePoint.z - min.z): Math.Abs(max.z - referencePoint.z);
+
+        if (deltaX < deltaY && deltaX < deltaZ) return deltaX;
+        else if(deltaY < deltaZ) return deltaY;
+        else return deltaZ;
+    }
+
+    public static Stack<GameObject> findHierarchy(Vector3 pos){
+        
+        LayerMask mask = 1 << DETECTION_LAYER;
+        Collider[] colliders = Physics.OverlapSphere(pos, 0, mask);
+        List<Tuple<Collider, Vector3>> list = crateTupleList(colliders, pos);
+        list.Sort(compareTuple);
+        Stack<GameObject> result = new Stack<GameObject>(list.Count);
+
+        for (int i = list.Count - 1; i >= 0; i--){
+            result.Push(list[i].Item1.gameObject);
+        }
+
+        return result;
+    }
+
+    /*
+    void addTreeToList(Node node, List<Vector3> points){
+        points.Add(node.pos);
+
+        if (node.reflection != null){
+            addTreeToList(node.reflection, points);
+            points.Add(node.pos);
+        }
+
+        if (node.refraction != null){
+            addTreeToList(node.refraction, points);
+            points.Add(node.pos);
+        }
+    }
+
+     Node castRayHelper(Vector3 pos, Vector3 dir, Stack<GameObject> hierarchy, int numReflection, int numRefraction){
         
         if (numReflection + numRefraction > MAX_INTERACTION){
             return null;
@@ -182,10 +236,6 @@ public class Light
         
         int isHit = rayDetection(pos, dir, refractionHier, out hit, out n1, out n2);
         //Debug.Log(n1.ToString() + ", " + n2.ToString());
-        /*if (numReflection == 0 || numRefraction ==0){
-            printStack(reflectionHier);
-            printStack(refractionHier);
-        }*/
 
         // if the ray did not hit any objects
         if (isHit == 0){
@@ -237,7 +287,6 @@ public class Light
 
         return newNode;
     }
-
 
     // return how many elemnt is added/removed to the stack, 
     // postive means elements has been added to the stack
@@ -297,66 +346,5 @@ public class Light
         return result;
         
         
-    }
-
-    
-
-    // might cause problem due to multi-threading
-    
-    
- 
-    public static List<Tuple<Collider, Vector3>> crateTupleList(Collider[] colliders, Vector3 referencePoint){
-        List<Tuple<Collider, Vector3>> result = new List<Tuple<Collider, Vector3>>();
-        foreach(Collider c in colliders){
-            result.Add(new Tuple<Collider, Vector3>(c, referencePoint));
-        }
-        return result;
-    }
-
-    public static int compareTuple(Tuple<Collider, Vector3> t1, Tuple<Collider, Vector3> t2){    
-        //Debug.Log(t1.Item1.gameObject.name + " " + findShortestDistance(t1.Item1, t1.Item2).ToString());
-        //Debug.Log(t2.Item1.gameObject.name + " " + findShortestDistance(t2.Item1, t2.Item2).ToString());
-        if (findShortestDistance(t1.Item1, t1.Item2) < findShortestDistance(t2.Item1, t2.Item2)){
-            return -1;
-        }else{
-            return 1;
-        }
-    }
-
-    public static double findShortestDistance(Collider c, Vector3 referencePoint){
-
-        Vector3 min, max;
-        min = c.bounds.min;
-        max = c.bounds.max;
-
-        double deltaX, deltaY, deltaZ;
-        //x
-        deltaX = (Math.Abs(referencePoint.x - min.x) < Math.Abs(max.x - referencePoint.x))? Math.Abs(referencePoint.x - min.x): Math.Abs(max.x - referencePoint.x);
-        //y
-        deltaY = (Math.Abs(referencePoint.y - min.y) < Math.Abs(max.y - referencePoint.y))? Math.Abs(referencePoint.y - min.y): Math.Abs(max.y - referencePoint.y);
-
-        //z
-        deltaZ = (Math.Abs(referencePoint.z - min.z) < Math.Abs(max.z - referencePoint.z))? Math.Abs(referencePoint.z - min.z): Math.Abs(max.z - referencePoint.z);
-
-        if (deltaX < deltaY && deltaX < deltaZ) return deltaX;
-        else if(deltaY < deltaZ) return deltaY;
-        else return deltaZ;
-    }
-
-    public static Stack<GameObject> findHierarchy(Vector3 pos){
-        
-        LayerMask mask = 1 << DETECTION_LAYER;
-        Collider[] colliders = Physics.OverlapSphere(pos, 0, mask);
-        List<Tuple<Collider, Vector3>> list = crateTupleList(colliders, pos);
-        list.Sort(compareTuple);
-        Stack<GameObject> result = new Stack<GameObject>(list.Count);
-
-        for (int i = list.Count - 1; i >= 0; i--){
-            result.Push(list[i].Item1.gameObject);
-        }
-
-        return result;
-    }
-
-    
+    }*/
 }

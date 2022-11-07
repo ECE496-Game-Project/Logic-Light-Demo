@@ -4,35 +4,22 @@ using UnityEngine;
 
 public class Node{
     public Vector3 pos;
-    public Node reflection;
-    public Node refraction;
+    //public Node reflection;
+    //public Node refraction;
     public List<Node> children;
 
-    public Node(Vector3 pos, Node reflection, Node refraction){
-        this.pos = pos;
-        this.reflection = reflection;
-        this.refraction = refraction;
-    }
     public Node(){
         this.pos = Vector3.zero;
-        this.reflection = null;
-        this.refraction = null;
         children = new List<Node>();
     }
 
-    public Node(Vector3 pos){
-        this.pos = pos;
-        this.reflection = null;
-        this.refraction = null;
-    }
 
     public void setPosition(Vector3 pos){
         this.pos = pos;
     }
 
-    public void setChildren(Node reflection, Node refraction){
-        this.reflection = reflection;
-        this.refraction = refraction;
+    public void setChildren(List<Node> children){
+        this.children = children;
     }
 }
 

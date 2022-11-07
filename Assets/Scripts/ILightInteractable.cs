@@ -29,7 +29,7 @@ public struct LightOutputInfo{
         this.rays = rays;
     }
 
-}
+} 
 
 //class with this interface will interact with light
 public interface ILightInteractable
